@@ -1,0 +1,17 @@
+{
+  "company": "Oracle",
+  "currency": "USD",
+  "items": {
+    "4":  {"value": "=-36369-708", "note": "Oracle QR Aug 26\nCash and cash equivalents\npg 4\nMarketable securities\npg 4\n(Restricted cash $2.6bn sits in prepaid expenses, not in cash - not added; pg 10)"},
+    "5":  {"value": 7625, "note": "Oracle QR Aug 26\nNotes payable and other borrowings, current\npg 4"},
+    "6":  {"value": 749, "note": "Oracle QR Aug 26\nFinance lease liabilities, current\npg 19\n(Within other current liabilities, not in borrowings - Oracle AR May 26 pg 118)"},
+    "7":  {"value": 4027, "note": "Oracle QR Aug 26\nOperating lease liabilities, current\npg 19"},
+    "8":  {"value": 117712, "note": "Oracle QR Aug 26\nNotes payable and other borrowings, non-current\npg 4"},
+    "9":  {"value": 8436, "note": "Oracle QR Aug 26\nFinance lease liabilities, non-current\npg 19\n(Within other non-current liabilities, not in borrowings - Oracle AR May 26 pg 118)"},
+    "10": {"value": 30594, "note": "Oracle QR Aug 26\nOperating lease liabilities (non-current)\npg 4"},
+    "12": {"value": 256, "note": "Oracle AR May 26\nAggregate net liability (funded status) of defined benefit plans\npg 144\n(Carry-forward - not disclosed in QR)"},
+    "13": {"value": 4954, "note": "Oracle QR Aug 26\nPreferred stock - 6.50% Series D Mandatory Convertible Preferred Stock\npg 4"},
+    "14": {"value": 424, "note": "Oracle QR Aug 26\nNoncontrolling interests\npg 4"},
+    "16": {"value": 3023.736, "note": "Oracle QR Aug 26\nShares of common stock outstanding as of September 7, 2026: 3,023,736,000 (in millions)\npg 1"}
+  }
+}

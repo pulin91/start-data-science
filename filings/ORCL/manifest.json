@@ -1,0 +1,31 @@
+{
+  "ticker": "ORCL",
+  "cik": 1341439,
+  "company": "Oracle",
+  "filings": [
+    {
+      "form": "10-Q",
+      "filing_date": "2026-09-11",
+      "report_date": "2026-08-31",
+      "accession": "0001193125-26-389274",
+      "primary_document": "orcl-20260831.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/1341439/000119312526389274/orcl-20260831.htm",
+      "html": "ORCL_10-Q_2026-08-31.htm",
+      "pdf": "ORCL_10-Q_2026-08-31.pdf",
+      "role": "latest",
+      "label": "Oracle QR Aug 26"
+    },
+    {
+      "form": "10-K",
+      "filing_date": "2026-06-22",
+      "report_date": "2026-05-31",
+      "accession": "0001193125-26-277521",
+      "primary_document": "orcl-20260531.htm",
+      "url": "https://www.sec.gov/Archives/edgar/data/1341439/000119312526277521/orcl-20260531.htm",
+      "html": "ORCL_10-K_2026-05-31.htm",
+      "pdf": "ORCL_10-K_2026-05-31.pdf",
+      "role": "latest_annual",
+      "label": "Oracle AR May 26"
+    }
+  ]
+}
