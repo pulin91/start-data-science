@@ -27,10 +27,12 @@ Usage:
 import argparse
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 from openpyxl import load_workbook
@@ -97,6 +99,33 @@ def resize_notes(ws):
                 cell.comment.width, cell.comment.height = note_size(cell.comment.text)
 
 
+NOTE_RUN_PROPS = '<sz val="9"/><color indexed="81"/><rFont val="Tahoma"/><family val="2"/>'
+
+
+def bold_note_titles(path):
+    """Make the "Claude Analyst:" title line of every note bold.
+
+    openpyxl only writes plain-text notes, so after saving rewrite each note's
+    text in xl/comments*.xml as a bold title run plus a regular body run, which is
+    how Excel itself stores the author line of a note.
+    """
+    title = re.escape(NOTE_AUTHOR + ":")
+    pattern = re.compile(rf"<text><t(?: [^>]*)?>({title})(.*?)</t></text>", re.S)
+    replacement = (
+        f"<text><r><rPr><b/>{NOTE_RUN_PROPS}</rPr><t>\\1</t></r>"
+        f'<r><rPr>{NOTE_RUN_PROPS}</rPr><t xml:space="preserve">\\2</t></r></text>'
+    )
+    path = Path(path)
+    tmp = path.with_suffix(".tmp.xlsx")
+    with zipfile.ZipFile(path) as src, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if re.fullmatch(r"xl/comments/comment\d+\.xml", item.filename):
+                data = pattern.sub(replacement, data.decode("utf-8")).encode("utf-8")
+            dst.writestr(item, data)
+    tmp.replace(path)
+
+
 def check_formulas(path):
     """Recalculate a copy in LibreOffice and report any Excel error values."""
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
@@ -148,6 +177,7 @@ def main():
     resize_notes(ws)
     wb.calculation.fullCalcOnLoad = True
     wb.save(args.workbook)
+    bold_note_titles(args.workbook)
     print(f"Wrote {len(items)} cells for {data['company']} into column {ws.cell(row=1, column=col).column_letter}")
     if not check_formulas(args.workbook):
         sys.exit(1)

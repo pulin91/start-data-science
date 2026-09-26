@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta, timezone
 import requests
 from openpyxl import load_workbook
 
-from update_comps import check_formulas, resize_notes, write_cell
+from update_comps import bold_note_titles, check_formulas, resize_notes, write_cell
 
 CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
 PRICE_ROW = 19
@@ -70,6 +70,7 @@ def main():
     resize_notes(ws)
     wb.calculation.fullCalcOnLoad = True
     wb.save(args.workbook)
+    bold_note_titles(args.workbook)
     print(f"{args.company}: {args.ticker} close {price} {currency} on {day}")
     if not check_formulas(args.workbook):
         raise SystemExit(1)
