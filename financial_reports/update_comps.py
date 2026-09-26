@@ -13,7 +13,8 @@ Input is a JSON file produced from reading the filings, e.g.
     }
 
 Every item must carry a note: each cell is written with its value, Aptos 10 blue
-font, the number format and a legacy yellow Note in one step. The Price row and
+font, the number format and a legacy yellow Note in one step. Notes are titled
+"Claude Analyst" and sized so the full text shows on hover. The Price row and
 the formula rows are never touched.
 
 The company goes into the column whose row 1 already holds its name, otherwise
@@ -25,6 +26,7 @@ Usage:
 
 import argparse
 import json
+import math
 import shutil
 import subprocess
 import sys
@@ -36,6 +38,10 @@ from openpyxl.comments import Comment
 from openpyxl.styles import Font
 
 BLUE = "000000FF"
+NOTE_AUTHOR = "Claude Analyst"
+# Excel draws notes in ~9pt Tahoma: about 7px per character and 15px per line.
+NOTE_CHAR_PX, NOTE_LINE_PX, NOTE_PAD_PX = 7, 15, 24
+NOTE_MIN_WIDTH, NOTE_MAX_WIDTH = 180, 440
 DEFAULT_NUM_FMT = '#,##0.0;(#,##0.0);"-"'
 WRITABLE_ROWS = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16}
 PROTECTED_ROWS = {18, 19, 20, 22, 23, 24, 25}
@@ -62,15 +68,33 @@ def existing_number_format(ws, col):
     return DEFAULT_NUM_FMT
 
 
+def note_size(text):
+    """Width/height in px so the whole note is visible on hover, without scrolling."""
+    lines = text.split("\n")
+    longest = max(len(line) for line in lines)
+    width = min(max(longest * NOTE_CHAR_PX + NOTE_PAD_PX, NOTE_MIN_WIDTH), NOTE_MAX_WIDTH)
+    chars_per_line = (width - NOTE_PAD_PX) // NOTE_CHAR_PX
+    wrapped = sum(max(1, math.ceil(len(line) / chars_per_line)) for line in lines)
+    return width, wrapped * NOTE_LINE_PX + NOTE_PAD_PX
+
+
 def write_cell(ws, row, col, value, note_text, num_fmt):
     cell = ws.cell(row=row, column=col)
     cell.value = value
     cell.font = Font(name="Aptos", size=10, color=BLUE)
     cell.number_format = num_fmt
-    note = Comment(note_text, "")
-    note.width = 250
-    note.height = 20 + 15 * note_text.count("\n")
+    text = f"{NOTE_AUTHOR}:\n{note_text}"
+    note = Comment(text, NOTE_AUTHOR)
+    note.width, note.height = note_size(text)
     cell.comment = note
+
+
+def resize_notes(ws):
+    """openpyxl forgets note sizes when it reloads a file, so re-apply them before every save."""
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.comment:
+                cell.comment.width, cell.comment.height = note_size(cell.comment.text)
 
 
 def check_formulas(path):
@@ -121,6 +145,7 @@ def main():
     for row, item in sorted(items.items()):
         write_cell(ws, row, col, item["value"], item["note"], num_fmt)
 
+    resize_notes(ws)
     wb.calculation.fullCalcOnLoad = True
     wb.save(args.workbook)
     print(f"Wrote {len(items)} cells for {data['company']} into column {ws.cell(row=1, column=col).column_letter}")
