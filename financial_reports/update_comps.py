@@ -1,0 +1,132 @@
+"""Write extracted EV-bridge line items into the Trading Comps workbook.
+
+Input is a JSON file produced from reading the filings, e.g.
+``filings/ORCL/ev_bridge.json``:
+
+    {
+      "company": "Oracle",
+      "currency": "USD",
+      "items": {
+        "4":  {"value": "=-10786-1003", "note": "Oracle QR Aug 26\\nCash and cash equivalents\\npg 5\\nMarketable securities\\npg 5"},
+        "13": {"value": 0, "note": "Oracle QR Aug 26\\nPreferred stock - nil per balance sheet\\npg 5"}
+      }
+    }
+
+Every item must carry a note: each cell is written with its value, Aptos 10 blue
+font, the number format and a legacy yellow Note in one step. The Price row and
+the formula rows are never touched.
+
+The company goes into the column whose row 1 already holds its name, otherwise
+into the first empty column from B onwards.
+
+Usage:
+    python financial_reports/update_comps.py templates/TradingComps.xlsx filings/ORCL/ev_bridge.json
+"""
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from openpyxl import load_workbook
+from openpyxl.comments import Comment
+from openpyxl.styles import Font
+
+BLUE = "000000FF"
+DEFAULT_NUM_FMT = '#,##0.0;(#,##0.0);"-"'
+WRITABLE_ROWS = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16}
+PROTECTED_ROWS = {18, 19, 20, 22, 23, 24, 25}
+ERROR_TOKENS = ("#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#N/A", "#NUM!", "#NULL!")
+
+
+def target_column(ws, company):
+    for col in range(2, ws.max_column + 2):
+        name = ws.cell(row=1, column=col).value
+        if name and str(name).strip().lower() == company.lower():
+            return col
+    col = 2
+    while ws.cell(row=1, column=col).value not in (None, ""):
+        col += 1
+    return col
+
+
+def existing_number_format(ws, col):
+    """Use the format already live in the sheet (pre-flight check), not an assumed one."""
+    for c in [col] + list(range(2, ws.max_column + 1)):
+        fmt = ws.cell(row=4, column=c).number_format
+        if fmt and fmt != "General":
+            return fmt
+    return DEFAULT_NUM_FMT
+
+
+def write_cell(ws, row, col, value, note_text, num_fmt):
+    cell = ws.cell(row=row, column=col)
+    cell.value = value
+    cell.font = Font(name="Aptos", size=10, color=BLUE)
+    cell.number_format = num_fmt
+    note = Comment(note_text, "")
+    note.width = 250
+    note.height = 20 + 15 * note_text.count("\n")
+    cell.comment = note
+
+
+def check_formulas(path):
+    """Recalculate a copy in LibreOffice and report any Excel error values."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        print("warning: LibreOffice not found, skipping recalculation check", file=sys.stderr)
+        return True
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "csv", "--outdir", tmp, str(path)],
+            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120,
+        )
+        csv_text = (Path(tmp) / (Path(path).stem + ".csv")).read_text(errors="replace")
+    errors = [t for t in ERROR_TOKENS if t in csv_text]
+    if errors:
+        print(f"Formula errors after recalculation: {', '.join(errors)}", file=sys.stderr)
+        return False
+    return True
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("workbook")
+    ap.add_argument("data", help="JSON file with the extracted line items")
+    ap.add_argument("--sheet", help="Worksheet name (default: active sheet)")
+    args = ap.parse_args()
+
+    data = json.loads(Path(args.data).read_text())
+    items = {int(k): v for k, v in data["items"].items()}
+
+    bad = sorted(set(items) & PROTECTED_ROWS) + sorted(set(items) - WRITABLE_ROWS - PROTECTED_ROWS)
+    if bad:
+        sys.exit(f"Refusing to write rows {bad}: only {sorted(WRITABLE_ROWS)} are input rows")
+    missing_notes = [r for r, v in items.items() if not str(v.get("note", "")).strip()]
+    if missing_notes:
+        sys.exit(f"Rows {missing_notes} have no source note; every written cell needs one")
+
+    # data_only=False (default) keeps existing formulas intact.
+    wb = load_workbook(args.workbook)
+    ws = wb[args.sheet] if args.sheet else wb.active
+    col = target_column(ws, data["company"])
+    num_fmt = existing_number_format(ws, col)
+
+    ws.cell(row=1, column=col, value=data["company"])
+    if data.get("currency"):
+        ws.cell(row=2, column=col, value=data["currency"])
+    for row, item in sorted(items.items()):
+        write_cell(ws, row, col, item["value"], item["note"], num_fmt)
+
+    wb.calculation.fullCalcOnLoad = True
+    wb.save(args.workbook)
+    print(f"Wrote {len(items)} cells for {data['company']} into column {ws.cell(row=1, column=col).column_letter}")
+    if not check_formulas(args.workbook):
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
